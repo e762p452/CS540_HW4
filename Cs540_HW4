@@ -1,0 +1,207 @@
+// CS540_HW4.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//Eddie Allen E762P452
+
+#include <iostream>
+#include <queue>
+#include <vector>
+#include <unordered_set>
+
+using namespace std;
+
+int pages[] = { 1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5 };
+int frames = 4;
+int n = sizeof(pages) / sizeof(pages[0]);
+
+void printFIFO(vector<int> pgTable, queue<int> pgQueue, int pageFaults) {
+    cout << "Page Table: {";
+    for (int j = 0; j < pgTable.size() - 1; j++) {
+        cout << pgTable.at(j) << ", ";
+    }
+    if (!pgTable.empty()) {
+        cout << pgTable.back();
+    }
+    cout << "}";
+
+    // Print the Frames and Faults
+    cout << ", Frames: [";
+    queue<int> tempQueue = pgQueue;
+    while (!tempQueue.empty()) {
+        cout << tempQueue.front();
+        tempQueue.pop();
+        if (!tempQueue.empty()) cout << ",";
+    }
+    cout << "], Faults: " << pageFaults << endl;
+}
+void printLRUOptimal(vector<int> pgTable, vector<int> pgFrames, int pageFaults) {
+    cout << "Page Fault: (";
+    for (int j = 0; j < pgTable.size() - 1; j++) {
+        cout << pgTable.at(j) << ", ";
+    }
+    if (!pgTable.empty()) {
+        cout << pgTable.back();
+    }
+    cout << ") ";
+
+    // Print the Frames and Faults
+    cout << ", Frames: [";
+    for (int j = 0; j < pgFrames.size() - 1; j++) {
+        cout << pgFrames.at(j) << ", ";
+    }
+    if (!pgFrames.empty()) {
+        cout << pgFrames.back();
+    }
+    cout << "], Faults: " << pageFaults << endl;
+}
+
+int fifo() {
+    queue<int> pageQueue;
+    unordered_set<int> pageSet;
+    int PF = 0;
+    vector<int> pageTable;                                      //For print function
+
+    for (int i = 0; i < n; i++) {
+        if (pageSet.size() < frames) {
+            if (pageSet.find(pages[i]) == pageSet.end()) {
+                pageSet.insert(pages[i]);
+                PF++;
+                pageQueue.push(pages[i]);
+                pageTable.push_back(pages[i]);                  //For print function
+            }
+        }
+        else {
+            if (pageSet.find(pages[i]) == pageSet.end()) {
+                int val = pageQueue.front();
+                pageQueue.pop();
+                pageSet.erase(val);
+                pageSet.insert(pages[i]);
+                pageQueue.push(pages[i]);
+                PF++;
+                if (find(pageTable.begin(), pageTable.end(), pages[i]) == pageTable.end()) {        //for print function
+                    pageTable.push_back(pages[i]);
+                }
+
+            }
+        }
+
+        printFIFO( pageTable, pageQueue, PF);                       //for print function
+    }
+
+    return PF;                                                 //changed this line
+}
+
+int lru() {
+    vector<int> pageTable;
+    vector<int> pageFrames;
+    int PF = 0;
+
+    // Iterating the reference string
+    for (int ref_page : pages) {
+        // If a ref_page already exists in pageQueue, remove it and append it at the end
+        auto it = std::find(pageFrames.begin(), pageFrames.end(), ref_page);
+        if (it != pageFrames.end()) {
+            pageFrames.erase(it);
+            pageFrames.push_back(ref_page);
+        }
+        else {
+            // Incrementing the page faults
+            PF++;
+            if (find(pageTable.begin(), pageTable.end(), ref_page) == pageTable.end()) {        //for print function
+                pageTable.push_back(ref_page);
+            }
+            // Check length of the pageQueue.
+            // If length of pageQueue is less than memory size, append ref_page into pageQueue
+            if (pageFrames.size() < frames) {
+                pageFrames.push_back(ref_page);
+            }
+            else {
+                // If length of pageQueue is greater than or equal to memory size,
+                // remove the least recently used page and append new page to pageQueue
+                pageFrames.erase(pageFrames.begin());
+                pageFrames.push_back(ref_page);
+            }
+        }
+
+        // Print the page table, frames, and faults
+        printLRUOptimal(pageTable, pageFrames, PF);
+    }
+
+    return PF;
+}
+
+bool searchPage(int key, vector<int>& frames)
+{
+    for (int i = 0; i < frames.size(); i++)
+    {
+        // if the frame is found, return true
+        if (frames[i] == key)
+            return true;
+    }
+
+    return false;
+}
+
+int predictPage(int page[], vector<int>& frames, int pageNumber, int pageIndex)
+{
+    int result = -1, farthestPage = pageIndex;
+    for (int i = 0; i < frames.size(); i++)
+    {
+        int j;
+        for (j = pageIndex; j < pageNumber; j++)
+        {
+            if (frames[i] == page[j])
+            {
+                if (j > farthestPage)
+                {
+                    farthestPage = j;
+                    result = i;
+                }
+                break;
+            }
+        }
+
+        if (j == pageNumber)
+            return i;
+    }
+
+    if (result == -1)
+        return 0;
+    else
+        return result;
+}
+
+int optimal() {
+    vector<int> pageFrames;
+    vector<int> pageTable;
+    int PF = 0;
+    for (int i = 0; i < n; i++) {
+        if (!searchPage(pages[i], pageFrames)) {
+            PF++;
+            if (find(pageTable.begin(), pageTable.end(), pages[i]) == pageTable.end()) {        //for print function
+                pageTable.push_back(pages[i]);
+            }
+        }
+        if (pageFrames.size() < frames) {
+            pageFrames.push_back(pages[i]);
+        }
+        else {
+            int j = predictPage(pages, pageFrames, n, i + 1);
+            pageFrames[j] = pages[i];
+        }
+        printLRUOptimal(pageTable, pageFrames, PF);
+    }
+
+    return PF;
+}
+
+
+int main() {
+    cout << "LRU output: " << endl;
+    cout << "Total page faults: [" << lru() << "]" << endl << endl;
+    cout << "Optimal output: " << endl;
+    cout << "Total page faults: [" << optimal() << "]" << endl << endl;
+    cout << "FIFO output: " << endl;
+    cout << "Total page faults: [" << fifo() << "]" << endl << endl;
+
+    return 0;
+
+}
